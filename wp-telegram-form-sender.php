@@ -2,7 +2,7 @@
 /*
 Plugin Name: WP Telegram Form Sender
 Description: Відправка даних з форми у Telegram
-Version: 1.0.4
+Version: 1.0.5
 Author: YuriiKosyi
 GitHub Plugin URI: seosmartua/wp-telegram-whatsapp
 */
@@ -36,7 +36,7 @@ function wp_telegram_form_sender_settings_page() {
     ?>
     <div class="wrap">
         <h2>Налаштування WP Telegram Form Sender</h2>
-        <form method="post" action="">
+        <form method="post" action="options.php">
             <?php
             settings_fields('wp_telegram_form_sender_options');
             do_settings_sections('wp-telegram-form-sender');
@@ -81,6 +81,7 @@ function wp_telegram_form_sender_settings_init() {
         'wp_telegram_form_sender_chat_id',
         'Telegram Chat ID',
         'wp_telegram_form_sender_chat_id_render',
+        'wp-telegram-form-sender',
         'wp_telegram_form_sender_section'
     );
 }
