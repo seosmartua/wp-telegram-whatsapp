@@ -2,7 +2,7 @@
 /*
 Plugin Name: WP Telegram Form Sender
 Description: Відправка даних з форми у Telegram
-Version: 1.0.1
+Version: 1.0.2
 Author: YuriiKosyi
 GitHub Plugin URI: seosmartua/wp-telegram-whatsapp
 */
