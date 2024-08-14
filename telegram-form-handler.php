@@ -4,8 +4,19 @@ if (!defined('ABSPATH')) {
     exit; // Запобігаємо прямому доступу
 }
 
+// Додаємо власний інтервал для крон-задачі
+add_filter('cron_schedules', 'add_custom_cron_interval');
+
+function add_custom_cron_interval($schedules) {
+    $schedules['every_five_minutes'] = array(
+        'interval' => 300, // 300 секунд = 5 хвилин
+        'display' => __('Every 5 Minutes')
+    );
+    return $schedules;
+}
+
 if (!wp_next_scheduled('telegram_check_new_entries')) {
-    wp_schedule_event(time(), 'hourly', 'telegram_check_new_entries');
+    wp_schedule_event(time(), 'every_five_minutes', 'telegram_check_new_entries');
 }
 
 add_action('telegram_check_new_entries', 'check_new_entries_for_telegram');
