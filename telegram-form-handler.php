@@ -1,14 +1,12 @@
 <?php
 
 if (!defined('ABSPATH')) {
-    exit;
+    exit; // Запобігаємо прямому доступу
 }
 
 require_once plugin_dir_path(__FILE__) . 'telegram-functions.php';
 
-if (!wp_next_scheduled('telegram_check_new_entries')) {
-    wp_schedule_event(time(), 'every_five_minutes', 'telegram_check_new_entries');
-}
+add_action('init', 'check_new_entries_for_telegram');
 
 if (!function_exists('check_new_entries_for_telegram')) {
     function check_new_entries_for_telegram() {
@@ -16,7 +14,7 @@ if (!function_exists('check_new_entries_for_telegram')) {
         $table_name = $wpdb->prefix . 'wws_analytics';
 
         $last_checked_id = get_last_sent_id();
-        $query = "SELECT * FROM $table_name WHERE id > $last_checked_id";
+        $query = "SELECT * FROM $table_name WHERE id > $last_checked_id ORDER BY id ASC";
         $new_entries = $wpdb->get_results($query);
 
         if (!empty($new_entries)) {
@@ -33,11 +31,11 @@ if (!function_exists('check_new_entries_for_telegram')) {
 
                 $response = wp_telegram_form_sender_send($data);
 
-                if (is_wp_error($response)) {
-                    save_last_sent_status('error');
-                } else {
+                if (!is_wp_error($response)) {
                     set_last_sent_id($entry->id);
                     save_last_sent_status('success');
+                } else {
+                    save_last_sent_status('error');
                 }
             }
         } else {
@@ -45,5 +43,3 @@ if (!function_exists('check_new_entries_for_telegram')) {
         }
     }
 }
-
-add_action('telegram_check_new_entries', 'check_new_entries_for_telegram');

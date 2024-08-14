@@ -2,7 +2,7 @@
 /*
 Plugin Name: WP Telegram Form Sender
 Description: Відправка даних з форми у Telegram
-Version: 1.0.6
+Version: 1.0.7
 Author: YuriiKosyi
 GitHub Plugin URI: seosmartua/wp-telegram-whatsapp
 */
@@ -17,6 +17,7 @@ add_action('admin_menu', 'wp_telegram_form_sender_menu');
 // Підключення файлів
 require_once plugin_dir_path(__FILE__) . 'telegram-functions.php';
 require_once plugin_dir_path(__FILE__) . 'telegram-form-handler.php';
+require_once plugin_dir_path(__FILE__) . 'telegram-manual-send.php';
 
 function wp_telegram_form_sender_menu() {
     add_options_page(
@@ -98,76 +99,4 @@ function wp_telegram_form_sender_bot_token_render() {
 function wp_telegram_form_sender_chat_id_render() {
     $chat_id = get_option('wp_telegram_form_sender_chat_id', '');
     echo "<input type='text' name='wp_telegram_form_sender_chat_id' value='" . esc_attr($chat_id) . "' />";
-}
-
-// Функція для відправки повідомлень у Telegram
-function wp_telegram_form_sender_send($data) {
-    $bot_token = get_option('wp_telegram_form_sender_bot_token');
-    $chat_id = get_option('wp_telegram_form_sender_chat_id');
-
-    if (empty($bot_token) || empty($chat_id)) {
-        return new WP_Error('missing_data', 'Missing bot token or chat ID.');
-    }
-
-    $message = "IP: " . $data['visitor_ip'] . "\n";
-    $message .= "Number: " . $data['number'] . "\n";
-    $message .= "Message: " . $data['message'] . "\n";
-    $message .= "Referral: " . $data['referral'] . "\n";
-    $message .= "Device: " . $data['device_type'] . "\n";
-    $message .= "Date: " . $data['date'] . "\n";
-    $message .= "Timestamp: " . $data['timestamp'] . "\n";
-
-    $telegram_url = "https://api.telegram.org/bot$bot_token/sendMessage";
-    $args = [
-        'body' => json_encode([
-            'chat_id' => $chat_id,
-            'text' => $message,
-            'parse_mode' => 'HTML'
-        ]),
-        'headers' => ['Content-Type' => 'application/json'],
-        'method' => 'POST',
-        'data_format' => 'body',
-    ];
-
-    return wp_remote_post($telegram_url, $args);
-}
-
-// Функція для ручної відправки даних
-function manual_send_entries_to_telegram($num_records) {
-    global $wpdb;
-    $table_name = $wpdb->prefix . 'wws_analytics';
-
-    $last_checked_id = get_last_sent_id();
-    $query = "SELECT * FROM $table_name WHERE id > $last_checked_id ORDER BY id DESC";
-    
-    if ($num_records > 0) {
-        $query .= " LIMIT $num_records";
-    }
-
-    $entries = $wpdb->get_results($query);
-
-    if (!empty($entries)) {
-        foreach ($entries as $entry) {
-            $data = [
-                'visitor_ip' => $entry->visitor_ip,
-                'number' => $entry->number,
-                'message' => $entry->message,
-                'referral' => $entry->referral,
-                'device_type' => $entry->device_type,
-                'date' => $entry->date,
-                'timestamp' => $entry->timestamp,
-            ];
-
-            $response = wp_telegram_form_sender_send($data);
-
-            if (!is_wp_error($response)) {
-                set_last_sent_id($entry->id);
-                save_last_sent_status('success');
-            } else {
-                save_last_sent_status('error');
-            }
-        }
-    } else {
-        save_last_sent_status('no new entries');
-    }
 }
