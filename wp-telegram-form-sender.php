@@ -14,6 +14,9 @@ if (!defined('ABSPATH')) {
 // Додавання сторінки налаштувань
 add_action('admin_menu', 'wp_telegram_form_sender_menu');
 
+// Підключення файлу для обробки відправки даних у Telegram
+require_once plugin_dir_path(__FILE__) . 'telegram-form-handler.php';
+
 function wp_telegram_form_sender_menu() {
     add_options_page(
         'Telegram Form Sender',
