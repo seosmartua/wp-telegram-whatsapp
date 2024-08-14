@@ -2,7 +2,7 @@
 /*
 Plugin Name: WP Telegram Form Sender
 Description: Відправка даних з форми у Telegram
-Version: 1.0.5
+Version: 1.0.6
 Author: YuriiKosyi
 GitHub Plugin URI: seosmartua/wp-telegram-whatsapp
 */
@@ -30,7 +30,8 @@ function wp_telegram_form_sender_menu() {
 
 function wp_telegram_form_sender_settings_page() {
     if (isset($_POST['manual_send'])) {
-        check_new_entries_for_telegram();
+        $num_records = isset($_POST['num_records']) ? intval($_POST['num_records']) : 0;
+        manual_send_entries_to_telegram($num_records);
         echo '<div class="updated"><p>Manual data send executed.</p></div>';
     }
     ?>
@@ -48,6 +49,9 @@ function wp_telegram_form_sender_settings_page() {
         <p>Час останньої відправки: <?php echo esc_html(get_last_sent_time()); ?></p>
         <p>Останній відправлений ID: <?php echo esc_html(get_last_sent_id()); ?></p>
         <form method="post" action="">
+            <label for="num_records">Кількість записів для відправки:</label>
+            <input type="number" name="num_records" id="num_records" value="0" min="0" step="1" />
+            <p class="description">Введіть кількість записів, які потрібно відправити. Якщо вказати 0, відправляться лише нові записи.</p>
             <input type="hidden" name="manual_send" value="1" />
             <?php submit_button('Відправити дані вручну'); ?>
         </form>
@@ -126,4 +130,44 @@ function wp_telegram_form_sender_send($data) {
     ];
 
     return wp_remote_post($telegram_url, $args);
+}
+
+// Функція для ручної відправки даних
+function manual_send_entries_to_telegram($num_records) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'wws_analytics';
+
+    $last_checked_id = get_last_sent_id();
+    $query = "SELECT * FROM $table_name WHERE id > $last_checked_id ORDER BY id DESC";
+    
+    if ($num_records > 0) {
+        $query .= " LIMIT $num_records";
+    }
+
+    $entries = $wpdb->get_results($query);
+
+    if (!empty($entries)) {
+        foreach ($entries as $entry) {
+            $data = [
+                'visitor_ip' => $entry->visitor_ip,
+                'number' => $entry->number,
+                'message' => $entry->message,
+                'referral' => $entry->referral,
+                'device_type' => $entry->device_type,
+                'date' => $entry->date,
+                'timestamp' => $entry->timestamp,
+            ];
+
+            $response = wp_telegram_form_sender_send($data);
+
+            if (!is_wp_error($response)) {
+                set_last_sent_id($entry->id);
+                save_last_sent_status('success');
+            } else {
+                save_last_sent_status('error');
+            }
+        }
+    } else {
+        save_last_sent_status('no new entries');
+    }
 }
