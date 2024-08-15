@@ -2,7 +2,7 @@
 /*
 Plugin Name: WP Telegram Form Sender
 Description: Відправка даних з форми у Telegram
-Version: 1.0.8
+Version: 1.0.9
 Author: YuriiKosyi
 GitHub Plugin URI: seosmartua/wp-telegram-whatsapp
 */
@@ -99,16 +99,19 @@ function wp_telegram_form_sender_bot_token_render() {
 function wp_telegram_form_sender_chat_id_render() {
     $chat_id = get_option('wp_telegram_form_sender_chat_id', '');
     echo "<input type='text' name='wp_telegram_form_sender_chat_id' value='" . esc_attr($chat_id) . "' />";
+    echo "<p class='description'>Введіть декілька Chat ID, розділених комами, щоб відправити повідомлення декільком користувачам.</p>";
 }
 
 // Функція для відправки повідомлень у Telegram
 function wp_telegram_form_sender_send($data) {
     $bot_token = get_option('wp_telegram_form_sender_bot_token');
-    $chat_id = get_option('wp_telegram_form_sender_chat_id');
+    $chat_ids = get_option('wp_telegram_form_sender_chat_id');
 
-    if (empty($bot_token) || empty($chat_id)) {
+    if (empty($bot_token) || empty($chat_ids)) {
         return new WP_Error('missing_data', 'Missing bot token or chat ID.');
     }
+
+    $chat_ids = explode(',', $chat_ids); // Розділяємо chat_id по комі та створюємо масив
 
     $message = "IP: " . $data['visitor_ip'] . "\n";
     $message .= "Number: " . $data['number'] . "\n";
@@ -118,17 +121,28 @@ function wp_telegram_form_sender_send($data) {
     $message .= "Date: " . $data['date'] . "\n";
     $message .= "Timestamp: " . $data['timestamp'] . "\n";
 
-    $telegram_url = "https://api.telegram.org/bot$bot_token/sendMessage";
-    $args = [
-        'body' => json_encode([
-            'chat_id' => $chat_id,
-            'text' => $message,
-            'parse_mode' => 'HTML'
-        ]),
-        'headers' => ['Content-Type' => 'application/json'],
-        'method' => 'POST',
-        'data_format' => 'body',
-    ];
+    foreach ($chat_ids as $chat_id) {
+        $chat_id = trim($chat_id); // Видаляємо зайві пробіли
 
-    return wp_remote_post($telegram_url, $args);
+        $telegram_url = "https://api.telegram.org/bot$bot_token/sendMessage";
+        $args = [
+            'body' => json_encode([
+                'chat_id' => $chat_id,
+                'text' => $message,
+                'parse_mode' => 'HTML'
+            ]),
+            'headers' => ['Content-Type' => 'application/json'],
+            'method' => 'POST',
+            'data_format' => 'body',
+        ];
+
+        $response = wp_remote_post($telegram_url, $args);
+
+        if (is_wp_error($response)) {
+            return $response; // Повертаємо помилку, якщо щось пішло не так
+        }
+    }
+
+    return true; // Повертаємо успіх, якщо всі повідомлення були відправлені
 }
+
