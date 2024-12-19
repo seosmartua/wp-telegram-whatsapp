@@ -2,7 +2,7 @@
 /*
 Plugin Name: WP Telegram Form Sender
 Description: Відправка даних з форми у Telegram
-Version: 1.2.2
+Version: 1.2.3
 Author: YuriiKosyi
 GitHub Plugin URI: seosmartua/wp-telegram-whatsapp
 */
@@ -31,18 +31,23 @@ function wp_telegram_form_sender_menu() {
 // Реєстрація налаштувань
 add_action('admin_init', 'wp_telegram_form_sender_settings_init');
 function wp_telegram_form_sender_settings_init() {
+    // Налаштування для Telegram
     register_setting('wp_telegram_form_sender_options', 'wp_telegram_form_sender_bot_token');
     register_setting('wp_telegram_form_sender_options', 'wp_telegram_form_sender_chat_id');
+    
+    // Налаштування для GA4
     register_setting('wp_telegram_form_sender_options', 'wp_telegram_measurement_id');
     register_setting('wp_telegram_form_sender_options', 'wp_telegram_api_secret');
 
+    // Секція Telegram
     add_settings_section(
         'wp_telegram_form_sender_section',
-        'Налаштування',
+        'Налаштування Telegram',
         null,
         'wp-telegram-form-sender'
     );
 
+    // Поля для Telegram
     add_settings_field(
         'wp_telegram_form_sender_bot_token',
         'Bot Token',
@@ -58,17 +63,55 @@ function wp_telegram_form_sender_settings_init() {
         'wp-telegram-form-sender',
         'wp_telegram_form_sender_section'
     );
+
+    // Секція GA4
+    add_settings_section(
+        'wp_telegram_ga4_section',
+        'Налаштування Google Analytics 4',
+        null,
+        'wp-telegram-form-sender'
+    );
+
+    // Поля для GA4
+    add_settings_field(
+        'wp_telegram_measurement_id',
+        'GA4 Measurement ID',
+        'wp_telegram_measurement_id_render',
+        'wp-telegram-form-sender',
+        'wp_telegram_ga4_section'
+    );
+
+    add_settings_field(
+        'wp_telegram_api_secret',
+        'GA4 API Secret',
+        'wp_telegram_api_secret_render',
+        'wp-telegram-form-sender',
+        'wp_telegram_ga4_section'
+    );
 }
 
-// Функції рендерингу полів
+// Функції рендерингу полів Telegram
 function wp_telegram_form_sender_bot_token_render() {
     $value = get_option('wp_telegram_form_sender_bot_token');
-    echo "<input type='text' name='wp_telegram_form_sender_bot_token' value='" . esc_attr($value) . "'>";
+    echo "<input type='text' name='wp_telegram_form_sender_bot_token' value='" . esc_attr($value) . "' class='regular-text'>";
 }
 
 function wp_telegram_form_sender_chat_id_render() {
     $value = get_option('wp_telegram_form_sender_chat_id');
-    echo "<input type='text' name='wp_telegram_form_sender_chat_id' value='" . esc_attr($value) . "'>";
+    echo "<input type='text' name='wp_telegram_form_sender_chat_id' value='" . esc_attr($value) . "' class='regular-text'>";
+}
+
+// Функції рендерингу полів GA4
+function wp_telegram_measurement_id_render() {
+    $value = get_option('wp_telegram_measurement_id');
+    echo "<input type='text' name='wp_telegram_measurement_id' value='" . esc_attr($value) . "' class='regular-text'>";
+    echo "<p class='description'>Введіть ваш GA4 Measurement ID (починається з G-)</p>";
+}
+
+function wp_telegram_api_secret_render() {
+    $value = get_option('wp_telegram_api_secret');
+    echo "<input type='text' name='wp_telegram_api_secret' value='" . esc_attr($value) . "' class='regular-text'>";
+    echo "<p class='description'>Введіть ваш GA4 API Secret</p>";
 }
 
 // Сторінка налаштувань
@@ -123,6 +166,7 @@ function wp_telegram_form_sender_send($data) {
         }
     }
 
+    // Відправка події в GA4
     if ($success) {
         $measurement_id = get_option('wp_telegram_measurement_id');
         $api_secret = get_option('wp_telegram_api_secret');
