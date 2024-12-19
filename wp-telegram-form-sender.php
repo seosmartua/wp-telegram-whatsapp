@@ -2,7 +2,7 @@
 /*
 Plugin Name: WP Telegram Form Sender
 Description: Відправка даних з форми у Telegram
-Version: 1.2.3.1
+Version: 1.2.4
 Author: YuriiKosyi
 GitHub Plugin URI: seosmartua/wp-telegram-whatsapp
 */
@@ -225,7 +225,7 @@ function wp_telegram_form_sender_send($data) {
             error_log('GA4 Data to send: ' . print_r($ga4_data, true));
 
             // Використовуємо тестовий endpoint для дебагу
-            $ga4_endpoint = "https://www.google-analytics.com/debug/mp/collect";
+            $ga4_endpoint = "https://www.google-analytics.com/mp/collect";
             
             $response = wp_remote_post($ga4_endpoint . "?measurement_id=$measurement_id&api_secret=$api_secret", [
                 'body' => json_encode($ga4_data),
