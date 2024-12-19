@@ -2,7 +2,7 @@
 /*
 Plugin Name: WP Telegram Form Sender
 Description: Відправка даних з форми у Telegram
-Version: 1.2.4
+Version: 1.2.5
 Author: YuriiKosyi
 GitHub Plugin URI: seosmartua/wp-telegram-whatsapp
 */
@@ -58,6 +58,9 @@ function wp_telegram_form_sender_settings_init() {
     // Налаштування для GA4
     register_setting('wp_telegram_form_sender_options', 'wp_telegram_measurement_id');
     register_setting('wp_telegram_form_sender_options', 'wp_telegram_api_secret');
+    
+    // Налаштування для GitHub
+    register_setting('wp_telegram_form_sender_options', 'wp_telegram_github_token');
 
     // Секція Telegram
     add_settings_section(
@@ -108,6 +111,23 @@ function wp_telegram_form_sender_settings_init() {
         'wp-telegram-form-sender',
         'wp_telegram_ga4_section'
     );
+
+    // Секція GitHub
+    add_settings_section(
+        'wp_telegram_github_section',
+        'Налаштування GitHub',
+        null,
+        'wp-telegram-form-sender'
+    );
+
+    // Поле для GitHub токену
+    add_settings_field(
+        'wp_telegram_github_token',
+        'GitHub Token',
+        'wp_telegram_github_token_render',
+        'wp-telegram-form-sender',
+        'wp_telegram_github_section'
+    );
 }
 
 // Функції рендерингу полів
@@ -131,6 +151,12 @@ function wp_telegram_api_secret_render() {
     $value = get_option('wp_telegram_api_secret');
     echo "<input type='text' name='wp_telegram_api_secret' value='" . esc_attr($value) . "' class='regular-text'>";
     echo "<p class='description'>Введіть ваш GA4 API Secret</p>";
+}
+
+function wp_telegram_github_token_render() {
+    $value = get_option('wp_telegram_github_token');
+    echo "<input type='password' name='wp_telegram_github_token' value='" . esc_attr($value) . "' class='regular-text'>";
+    echo "<p class='description'>Введіть ваш GitHub Personal Access Token для автоматичних оновлень</p>";
 }
 
 // Сторінка налаштувань
@@ -221,10 +247,8 @@ function wp_telegram_form_sender_send($data) {
                 ]
             ];
 
-            // Логуємо дані перед відправкою
             error_log('GA4 Data to send: ' . print_r($ga4_data, true));
 
-            // Використовуємо тестовий endpoint для дебагу
             $ga4_endpoint = "https://www.google-analytics.com/mp/collect";
             
             $response = wp_remote_post($ga4_endpoint . "?measurement_id=$measurement_id&api_secret=$api_secret", [
@@ -243,4 +267,99 @@ function wp_telegram_form_sender_send($data) {
     }
 
     return $success;
+}
+
+// Функції для GitHub автооновлення
+add_filter('pre_set_site_transient_update_plugins', 'wp_telegram_check_update');
+function wp_telegram_check_update($transient) {
+    if (empty($transient->checked)) {
+        return $transient;
+    }
+
+    $github_token = get_option('wp_telegram_github_token');
+    if (empty($github_token)) {
+        return $transient;
+    }
+
+    $raw_response = wp_remote_get('https://api.github.com/repos/seosmartua/wp-telegram-whatsapp/releases/latest', [
+        'headers' => [
+            'Authorization' => 'token ' . $github_token,
+            'Accept' => 'application/vnd.github.v3+json'
+        ]
+    ]);
+
+    if (is_wp_error($raw_response)) {
+        return $transient;
+    }
+
+    $response = json_decode(wp_remote_retrieve_body($raw_response));
+    if (empty($response->tag_name)) {
+        return $transient;
+    }
+
+    $plugin_data = get_plugin_data(__FILE__);
+    $current_version = $plugin_data['Version'];
+
+    if (version_compare($current_version, $response->tag_name, '<')) {
+        $plugin_slug = plugin_basename(__FILE__);
+        $transient->response[$plugin_slug] = (object) [
+            'slug' => $plugin_slug,
+            'new_version' => $response->tag_name,
+            'url' => $response->html_url,
+            'package' => $response->zipball_url . '?access_token=' . $github_token
+        ];
+    }
+
+    return $transient;
+}
+
+add_filter('plugins_api', 'wp_telegram_plugin_info', 20, 3);
+function wp_telegram_plugin_info($res, $action, $args) {
+    if ($action !== 'plugin_information') {
+        return $res;
+    }
+
+    if ('wp-telegram-form-sender/wp-telegram-form-sender.php' !== $args->slug) {
+        return $res;
+    }
+
+    $github_token = get_option('wp_telegram_github_token');
+    if (empty($github_token)) {
+        return $res;
+    }
+
+    $raw_response = wp_remote_get('https://api.github.com/repos/seosmartua/wp-telegram-whatsapp/releases/latest', [
+        'headers' => [
+            'Authorization' => 'token ' . $github_token,
+            'Accept' => 'application/vnd.github.v3+json'
+        ]
+    ]);
+
+    if (is_wp_error($raw_response)) {
+        return $res;
+    }
+
+    $response = json_decode(wp_remote_retrieve_body($raw_response));
+    if (empty($response->tag_name)) {
+        return $res;
+    }
+
+    $res = new stdClass();
+    $res->name = 'WP Telegram Form Sender';
+    $res->slug = 'wp-telegram-form-sender';
+    $res->version = $response->tag_name;
+    $res->tested = '6.4.2';
+    $res->requires = '5.0';
+    $res->author = 'YuriiKosyi';
+    $res->author_profile = 'https://github.com/seosmartua';
+    $res->download_link = $response->zipball_url . '?access_token=' . $github_token;
+    $res->trunk = $response->zipball_url . '?access_token=' . $github_token;
+    $res->requires_php = '7.0';
+    $res->last_updated = $response->published_at;
+    $res->sections = [
+        'description' => 'Відправка даних з форми у Telegram',
+        'changelog' => $response->body
+    ];
+
+    return $res;
 }
