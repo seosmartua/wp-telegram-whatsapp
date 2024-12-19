@@ -1,10 +1,7 @@
 <?php
-
 if (!defined('ABSPATH')) {
     exit;
 }
-
-require_once plugin_dir_path(__FILE__) . 'telegram-functions.php';
 
 function manual_send_entries_to_telegram($num_records) {
     global $wpdb;
@@ -33,7 +30,7 @@ function manual_send_entries_to_telegram($num_records) {
 
             $response = wp_telegram_form_sender_send($data);
 
-            if (!is_wp_error($response)) {
+            if ($response) {
                 set_last_sent_id($entry->id);
                 save_last_sent_status('success');
             } else {
