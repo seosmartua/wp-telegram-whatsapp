@@ -2,7 +2,7 @@
 /*
 Plugin Name: WP Telegram Form Sender
 Description: Відправка даних з форми у Telegram
-Version: 1.2.3
+Version: 1.2.3.1
 Author: YuriiKosyi
 GitHub Plugin URI: seosmartua/wp-telegram-whatsapp
 */
@@ -15,6 +15,26 @@ if (!defined('ABSPATH')) {
 require_once plugin_dir_path(__FILE__) . 'telegram-functions.php';
 require_once plugin_dir_path(__FILE__) . 'telegram-form-handler.php';
 require_once plugin_dir_path(__FILE__) . 'telegram-manual-send.php';
+
+// Функція валідації GA4 даних
+function validate_ga4_data($measurement_id, $api_secret) {
+    if (empty($measurement_id) || !preg_match('/^G-[A-Z0-9]+$/', $measurement_id)) {
+        error_log('Invalid GA4 Measurement ID format');
+        return false;
+    }
+
+    if (empty($api_secret)) {
+        error_log('Empty GA4 API Secret');
+        return false;
+    }
+
+    return true;
+}
+
+// Функція оновлення статусу GA4
+function update_ga4_status($status) {
+    update_option('wp_telegram_last_ga4_status', $status . ' - ' . current_time('mysql'));
+}
 
 // Додавання меню
 add_action('admin_menu', 'wp_telegram_form_sender_menu');
@@ -90,7 +110,7 @@ function wp_telegram_form_sender_settings_init() {
     );
 }
 
-// Функції рендерингу полів Telegram
+// Функції рендерингу полів
 function wp_telegram_form_sender_bot_token_render() {
     $value = get_option('wp_telegram_form_sender_bot_token');
     echo "<input type='text' name='wp_telegram_form_sender_bot_token' value='" . esc_attr($value) . "' class='regular-text'>";
@@ -101,7 +121,6 @@ function wp_telegram_form_sender_chat_id_render() {
     echo "<input type='text' name='wp_telegram_form_sender_chat_id' value='" . esc_attr($value) . "' class='regular-text'>";
 }
 
-// Функції рендерингу полів GA4
 function wp_telegram_measurement_id_render() {
     $value = get_option('wp_telegram_measurement_id');
     echo "<input type='text' name='wp_telegram_measurement_id' value='" . esc_attr($value) . "' class='regular-text'>";
@@ -119,6 +138,17 @@ function wp_telegram_form_sender_settings_page() {
     ?>
     <div class="wrap">
         <h2>Налаштування WP Telegram Form Sender</h2>
+        
+        <?php
+        // Відображення статусу GA4
+        $last_ga4_status = get_option('wp_telegram_last_ga4_status', '');
+        if (!empty($last_ga4_status)) {
+            echo '<div class="notice notice-info">';
+            echo '<p>Останній статус відправки в GA4: ' . esc_html($last_ga4_status) . '</p>';
+            echo '</div>';
+        }
+        ?>
+
         <form method="post" action="options.php">
             <?php
             settings_fields('wp_telegram_form_sender_options');
@@ -163,6 +193,7 @@ function wp_telegram_form_sender_send($data) {
 
         if (is_wp_error($response)) {
             $success = false;
+            error_log('Telegram Error: ' . $response->get_error_message());
         }
     }
 
@@ -171,7 +202,7 @@ function wp_telegram_form_sender_send($data) {
         $measurement_id = get_option('wp_telegram_measurement_id');
         $api_secret = get_option('wp_telegram_api_secret');
 
-        if (!empty($measurement_id) && !empty($api_secret)) {
+        if (validate_ga4_data($measurement_id, $api_secret)) {
             $client_id = isset($_COOKIE['_ga']) ? $_COOKIE['_ga'] : uniqid('ga4_', true);
             
             $ga4_data = [
@@ -183,16 +214,31 @@ function wp_telegram_form_sender_send($data) {
                             'number' => $data['number'],
                             'message' => $data['message'],
                             'referral' => $data['referral'],
-                            'device_type' => $data['device_type']
+                            'device_type' => $data['device_type'],
+                            'debug_mode' => true
                         ]
                     ]
                 ]
             ];
 
-            wp_remote_post("https://www.google-analytics.com/mp/collect?measurement_id=$measurement_id&api_secret=$api_secret", [
+            // Логуємо дані перед відправкою
+            error_log('GA4 Data to send: ' . print_r($ga4_data, true));
+
+            // Використовуємо тестовий endpoint для дебагу
+            $ga4_endpoint = "https://www.google-analytics.com/debug/mp/collect";
+            
+            $response = wp_remote_post($ga4_endpoint . "?measurement_id=$measurement_id&api_secret=$api_secret", [
                 'body' => json_encode($ga4_data),
                 'headers' => ['Content-Type' => 'application/json']
             ]);
+
+            if (is_wp_error($response)) {
+                error_log('GA4 Error: ' . $response->get_error_message());
+                update_ga4_status('Помилка: ' . $response->get_error_message());
+            } else {
+                error_log('GA4 Response: ' . print_r($response['body'], true));
+                update_ga4_status('Успішно відправлено');
+            }
         }
     }
 
