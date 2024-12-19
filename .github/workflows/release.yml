@@ -1,0 +1,38 @@
+name: Create GitHub Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Відстежує зміни для тегів, які відповідають шаблону "vX.X.X"
+
+jobs:
+  release:
+    name: Release Plugin
+    runs-on: ubuntu-latest
+
+    steps:
+      # Клонування репозиторію
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Компресування файлів у .zip
+      - name: Create plugin zip
+        run: zip -r wp-telegram-form-sender.zip . --exclude .git\*
+
+      # Генерація опису змін (на основі стандартного CHANGELOG.md, якщо є)
+      - name: Generate Release Notes
+        id: notes
+        run: |
+          echo '## Що нового:' > RELEASE_NOTES.md
+          git log $(git describe --tags --abbrev=0)..HEAD --oneline >> RELEASE_NOTES.md
+        shell: bash
+
+      # Створення релізу
+      - name: Publish Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ github.ref_name }} # Використовується тег із пуша
+          name: ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          artifacts: wp-telegram-form-sender.zip
+          token: ${{ secrets.GITHUB_TOKEN }}
